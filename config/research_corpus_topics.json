@@ -1,0 +1,26 @@
+{
+  "description": "Seed topics for the expert-discovery MVP corpus. Keep this bounded so the graph has a clear scope.",
+  "papers_per_topic": 10,
+  "topics": [
+    {
+      "name": "Privacy-Preserving Healthcare ML",
+      "query": "privacy preserving machine learning healthcare medical data"
+    },
+    {
+      "name": "Medical Image Analysis",
+      "query": "medical image analysis deep learning diagnosis segmentation"
+    },
+    {
+      "name": "Graph Neural Networks",
+      "query": "graph neural networks node classification representation learning"
+    },
+    {
+      "name": "AI Safety And Alignment",
+      "query": "AI safety alignment robustness evaluation large language models"
+    },
+    {
+      "name": "MLOps And Model Deployment",
+      "query": "MLOps machine learning deployment monitoring production systems"
+    }
+  ]
+}
