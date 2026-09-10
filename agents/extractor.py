@@ -164,7 +164,7 @@ def extract(sanitized_text: str, doc_id: str = "unknown") -> dict:
 # Test
 
 if __name__ == "__main__":
-    from ingestion.base_ingester import ingest
+    from ingestion.ingester import ingest
     from security.pii_gateway import redact
 
     docs = ingest("parsed", limit=1)

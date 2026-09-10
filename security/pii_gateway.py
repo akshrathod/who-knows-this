@@ -155,7 +155,7 @@ def redact(text: str, doc_id: str = "unknown") -> dict:
 def redact_batch(docs: list[dict]) -> list[dict]:
     """
     Run redaction across a list of document dicts
-    from base_ingester. Adds sanitized_text and audit
+    from the ingester. Adds sanitized_text and audit
     to each doc dict in place.
     """
     print(f"Running PII redaction on {len(docs)} documents\n")

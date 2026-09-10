@@ -1,8 +1,8 @@
 """
 Build a bounded research-paper corpus from arXiv.
 
-This is the first data-acquisition step for the expert-discovery MVP. It keeps
-scope explicit: collect papers for configured research topics, save PDFs under
+This is the data-acquisition step for the expert-discovery MVP. It keeps scope
+explicit: collect papers for configured research topics, save PDFs under
 data/raw/, and write a metadata registry that downstream parsing and graph
 building can use as evidence.
 """
@@ -11,7 +11,6 @@ from __future__ import annotations
 
 import argparse
 import json
-import os
 import time
 import urllib.request
 from dataclasses import asdict, dataclass
@@ -19,8 +18,8 @@ from pathlib import Path
 from typing import Iterable
 
 import arxiv
-import boto3
 from dotenv import load_dotenv
+from storage.s3_storage import upload_file
 
 load_dotenv()
 
@@ -28,7 +27,6 @@ load_dotenv()
 DEFAULT_CONFIG_PATH = Path("config/research_corpus_topics.json")
 LOCAL_RAW_DIR = Path("data/raw")
 REGISTRY_FILENAME = "registry.json"
-S3_BUCKET = os.getenv("S3_BUCKET_NAME", "talent-profiling-raw-docs")
 
 
 @dataclass
@@ -52,16 +50,6 @@ class CorpusPaper:
     downloaded: bool = False
 
 
-def get_s3_client():
-    """Create an S3 client from environment credentials."""
-    return boto3.client(
-        "s3",
-        aws_access_key_id=os.getenv("AWS_ACCESS_KEY_ID"),
-        aws_secret_access_key=os.getenv("AWS_SECRET_ACCESS_KEY"),
-        region_name=os.getenv("AWS_REGION", "us-east-1"),
-    )
-
-
 def load_topic_config(config_path: Path = DEFAULT_CONFIG_PATH) -> dict:
     """Load corpus topic configuration."""
     if not config_path.exists():
@@ -82,7 +70,7 @@ def sanitize_filename(value: str, max_length: int = 90) -> str:
 
 def arxiv_id_from_entry(entry_id: str) -> str:
     """Extract the stable arXiv id from an entry URL."""
-    return entry_id.rstrip("/").split("/")[-1]
+    return entry_id.rstrip("/").removesuffix(".pdf").split("/")[-1]
 
 
 def paper_to_record(paper, topic: dict, output_dir: Path) -> CorpusPaper:
@@ -133,10 +121,10 @@ def download_pdf(pdf_url: str, destination: Path) -> bool:
         return False
 
 
-def upload_to_s3(s3, local_path: Path, s3_key: str) -> bool:
+def upload_to_s3(local_path: Path, s3_key: str) -> bool:
     """Upload one file to S3. Returns False instead of failing the corpus run."""
     try:
-        s3.upload_file(str(local_path), S3_BUCKET, s3_key)
+        upload_file(local_path, s3_key)
         return True
     except Exception as e:
         print(f"    S3 upload failed: {e}")
@@ -157,7 +145,7 @@ def load_existing_registry(path: Path) -> dict[str, dict]:
             key = arxiv_id_from_entry(record["entry_id"])
             record["arxiv_id"] = key
         if not key and record.get("pdf_url"):
-            key = arxiv_id_from_entry(record["pdf_url"].removesuffix(".pdf"))
+            key = arxiv_id_from_entry(record["pdf_url"])
             record["arxiv_id"] = key
         if not key:
             key = f"legacy-{index}-{sanitize_filename(record.get('title', 'untitled'))}"
@@ -197,7 +185,6 @@ def build_corpus(
     per_topic = papers_per_topic or int(config.get("papers_per_topic", 10))
     registry_path = output_dir / REGISTRY_FILENAME
     existing = load_existing_registry(registry_path)
-    s3 = get_s3_client() if upload_s3 else None
 
     print(f"Building corpus from {len(config['topics'])} topics")
     print(f"Registry: {registry_path}")
@@ -221,9 +208,9 @@ def build_corpus(
             if download:
                 record.downloaded = download_pdf(record.pdf_url, local_path)
 
-            if upload_s3 and s3 and record.downloaded:
+            if upload_s3 and record.downloaded:
                 s3_key = f"raw/{local_path.name}"
-                if upload_to_s3(s3, local_path, s3_key):
+                if upload_to_s3(local_path, s3_key):
                     record.s3_key = s3_key
 
             existing[record.arxiv_id] = asdict(record)
@@ -233,8 +220,8 @@ def build_corpus(
     records = list(existing.values())
     save_registry(registry_path, records)
 
-    if upload_s3 and s3 and registry_path.exists():
-        upload_to_s3(s3, registry_path, f"raw/{REGISTRY_FILENAME}")
+    if upload_s3 and registry_path.exists():
+        upload_to_s3(registry_path, f"raw/{REGISTRY_FILENAME}")
 
     downloaded_count = sum(1 for record in records if record.get("downloaded"))
     print(f"Corpus records: {len(records)}")

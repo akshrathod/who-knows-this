@@ -18,7 +18,7 @@ from dotenv import load_dotenv
 
 from langgraph.graph import StateGraph, END
 
-from ingestion.base_ingester import ingest
+from ingestion.ingester import ingest
 from security.pii_gateway import redact
 from agents.extractor import extract
 from agents.graph_agent import generate_cypher
@@ -46,7 +46,7 @@ class AgentState(TypedDict):
 
 
 def initial_state(doc: dict) -> AgentState:
-    """Build a fresh state object from a base_ingester document dict."""
+    """Build a fresh state object from an ingested document dict."""
     return AgentState(
         doc_id         = doc["doc_id"],
         raw_text       = doc["text"],
@@ -306,5 +306,5 @@ def run_pipeline(docs: list[dict]) -> list[dict]:
 
 
 if __name__ == "__main__":
-    docs = ingest("parsed", limit=6)
+    docs = ingest("s3", limit=6)
     run_pipeline(docs)
